@@ -133,8 +133,8 @@ try:
 except FileNotFoundError as e:
     print(FILE_ERR_STR, '\n', e)
     with open(INPUT_FNAME, 'w', newline='') as f:
-        writer = csv.DictWriter(csvfile, fieldnames=[INPUT_FILE_HEADER_GROUP_TITLE,
-                                                     INPUT_FILE_HEADER_LINK])
+        writer = csv.DictWriter(f, fieldnames=[INPUT_FILE_HEADER_GROUP_TITLE,
+                                               INPUT_FILE_HEADER_LINK])
         writer.writeheader()
 except Exception as e:
     print('Произошла ошибка выполнения скрипта: ')
