@@ -2,6 +2,7 @@ import vk_api
 import csv
 import re
 import datetime
+import sys
 
 # Author: Nek-12 on Github:
 # https://github.com/Nek-12
@@ -59,8 +60,10 @@ try:
                           app_id=APP_ID)
 
     # parse the file with group IDs
-    with open(INPUT_FNAME, 'r', newline='') as csvf:
-        reader = csv.reader(csvf, delimiter=',', quotechar="\"")
+    with open(INPUT_FNAME, 'r', newline='', encoding=sys.getdefaultencoding()) as csvf:
+        dialect = csv.Sniffer().sniff(csvf.read(1024))
+        csvf.seek(0)
+        reader = csv.reader(csvf, dialect=dialect)
         for row in reader:
             if row[0] == INPUT_FILE_HEADER_GROUP_TITLE:
                 continue
