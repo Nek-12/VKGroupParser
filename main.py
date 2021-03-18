@@ -3,6 +3,8 @@ import csv
 import re
 import datetime
 import sys
+from charset_normalizer import CharsetNormalizerMatches as CnM
+
 
 # Author: Nek-12 on Github:
 # https://github.com/Nek-12
@@ -50,17 +52,10 @@ def yes_no(msg: str):
 vk = None
 data = []
 try:
-    if yes_no(LOGIN_REQ_STR):
-        login = input("Введите номер телефона или e-mail:").strip()
-        passw = input("Введите пароль:").strip()
-        vk = vk_api.VkApi(login=login, password=passw)
-        vk.auth()
-    else:
-        vk = vk_api.VkApi(token=SERVICE_TOKEN,
-                          app_id=APP_ID)
-
+    enc = CnM.from_path(INPUT_FNAME).best().first().encoding
+    print("Угадана кодировка файла: ", enc)
     # parse the file with group IDs
-    with open(INPUT_FNAME, 'r', newline='', encoding=sys.getdefaultencoding()) as csvf:
+    with open(INPUT_FNAME, 'r', newline='', encoding=enc) as csvf:
         dialect = csv.Sniffer().sniff(csvf.read(1024))
         csvf.seek(0)
         reader = csv.reader(csvf, dialect=dialect)
@@ -88,6 +83,17 @@ try:
             print(f"Попалась неверная ссылка: '{url}'. Пропускаю")
             continue
         # get the count
+
+        if vk is None:
+            if yes_no(LOGIN_REQ_STR):
+                login = input("Введите номер телефона или e-mail:").strip()
+                passw = input("Введите пароль:").strip()
+                vk = vk_api.VkApi(login=login, password=passw)
+                vk.auth()
+            else:
+                vk = vk_api.VkApi(token=SERVICE_TOKEN,
+                                  app_id=APP_ID)
+
         response = vk.method("groups.getMembers", {
             "group_id": gid,
             "count": 0  # only need count
@@ -125,7 +131,7 @@ try:
             print(DATE_ERR_STR, '\n', f"URL: {url}, err: {e}")
 
     # end the loop, save the data
-    with open(OUTPUT_FNAME, 'w', newline='') as csvfile:
+    with open(OUTPUT_FNAME, 'w', newline='', encoding=enc) as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=FIELDNAMES)
         writer.writeheader()
         for dictionary in data:
@@ -137,7 +143,7 @@ except FileNotFoundError as e:
     print(FILE_ERR_STR, '\n', e)
     with open(INPUT_FNAME, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=[INPUT_FILE_HEADER_GROUP_TITLE,
-                                               INPUT_FILE_HEADER_LINK])
+                                               INPUT_FILE_HEADER_LINK], dialect=csv.excel)
         writer.writeheader()
 except Exception as e:
     print('Произошла ошибка выполнения скрипта: ')
