@@ -29,7 +29,9 @@ FILE_ERR_STR = \
     f" |{INPUT_FILE_HEADER_GROUP_TITLE}|{INPUT_FILE_HEADER_LINK}| (без разделителей). Можно без заголовков."
 FIELDNAMES = ['Название', 'Ссылка', 'Количество участников', 'Последний пост', 'Первый пост']
 DATE_ERR_STR = "Не удалось загрузить дату. Возможно, она недоступна? Пропускаю."
-
+ENC_WARN = "ВНИМАНИЕ! Кодировка файла - не UTF-8. \n"\
+           "Скорее всего в символах, отличных от латыни - будут ошибки!\n"\
+           "Рекомендуется использовать ТОЛЬКО UTF-8"
 
 def date_str_from_response(response_dict: dict):
     item = response_dict['items'][0]['date']
@@ -48,12 +50,16 @@ def yes_no(msg: str):
         else:
             print("Неверный ввод.\n\n\n")
 
-
+enc = None
 vk = None
 data = []
 try:
     enc = CnM.from_path(INPUT_FNAME).best().first().encoding
     print("Угадана кодировка файла: ", enc)
+    if (enc != 'utf-8'):
+        print("\n\n", ENC_WARN, "\n\n")
+        if (yes_no("Использовать cp1251 вместо текущей кодировки?")):
+            enc = 'cp1251'
     # parse the file with group IDs
     with open(INPUT_FNAME, 'r', newline='', encoding=enc) as csvf:
         dialect = csv.Sniffer().sniff(csvf.read(1024))
@@ -93,15 +99,15 @@ try:
             else:
                 vk = vk_api.VkApi(token=SERVICE_TOKEN,
                                   app_id=APP_ID)
-
-        response = vk.method("groups.getMembers", {
-            "group_id": gid,
-            "count": 0  # only need count
-        })  # max 3 requests/second, blocks the script
-        count = response.get('count')
-        print(f"Подписчиков:  {count}")
-        if count is None:
-            print(f"Неверное количество подписчиков для {gid}: {count}.\n Пропускаю.")
+        try: 
+            response = vk.method("groups.getMembers", {
+                "group_id": gid,
+                "count": 0  # only need count
+            })  # max 3 requests/second, blocks the script
+            count = response.get('count')
+            print(f"Подписчиков:  {count}")
+        except Exception as e:
+            print(f"Не удалось получить подписчиков для {gid}.\n Пропускаю.", e)
 
         dictionary[FIELDNAMES[2]] = count
 
@@ -128,7 +134,7 @@ try:
             dictionary[FIELDNAMES[4]] = date
             print("Дата первого поста: ", date)
         except Exception as e:
-            print(DATE_ERR_STR, '\n', f"URL: {url}, err: {e}")
+            print(DATE_ERR_STR, '\n', f"URL: {url}, err: \n{e}")
 
     # end the loop, save the data
     with open(OUTPUT_FNAME, 'w', newline='', encoding=enc) as csvfile:
@@ -141,7 +147,7 @@ try:
 
 except FileNotFoundError as e:
     print(FILE_ERR_STR, '\n', e)
-    with open(INPUT_FNAME, 'w', newline='') as f:
+    with open(INPUT_FNAME, 'w', newline='', encoding = "utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[INPUT_FILE_HEADER_GROUP_TITLE,
                                                INPUT_FILE_HEADER_LINK], dialect=csv.excel)
         writer.writeheader()
