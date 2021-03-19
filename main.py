@@ -108,6 +108,7 @@ try:
             print(f"Подписчиков:  {count}")
         except Exception as e:
             print(f"Не удалось получить подписчиков для {gid}.\n Пропускаю.", e)
+            count = None
 
         dictionary[FIELDNAMES[2]] = count
 
