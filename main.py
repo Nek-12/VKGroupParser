@@ -2,9 +2,7 @@ import vk_api
 import csv
 import re
 import datetime
-import sys
 from charset_normalizer import CharsetNormalizerMatches as CnM
-
 
 # Author: Nek-12 on Github:
 # https://github.com/Nek-12
@@ -29,14 +27,28 @@ FILE_ERR_STR = \
     f" |{INPUT_FILE_HEADER_GROUP_TITLE}|{INPUT_FILE_HEADER_LINK}| (без разделителей). Можно без заголовков."
 FIELDNAMES = ['Название', 'Ссылка', 'Количество участников', 'Последний пост', 'Первый пост']
 DATE_ERR_STR = "Не удалось загрузить дату. Возможно, она недоступна? Пропускаю."
-ENC_WARN = "ВНИМАНИЕ! Кодировка файла - не UTF-8. \n"\
-           "Скорее всего в символах, отличных от латыни - будут ошибки!\n"\
-           "Рекомендуется использовать ТОЛЬКО UTF-8"
+ENC_WARN = "ВНИМАНИЕ! Кодировка файла - не UTF-8. \n" \
+           "Скорее всего в символах, отличных от латыни - будут ошибки!\n" \
+           "Рекомендуется использовать UTF-8"
 
-def date_str_from_response(response_dict: dict):
-    item = response_dict['items'][0]['date']
-    d = datetime.date.fromtimestamp(float(item))
+
+def date_from_timestamp(timestamp: float):
+    return datetime.date.fromtimestamp(timestamp)
+
+
+def to_str(d: datetime.date):
     return f"{d.day}.{d.month}.{d.year}"
+
+
+def latest_date_str(items: list):
+    # date of the 1st post
+    date1 = date_from_timestamp(float(items[0]['date']))
+    if len(items) > 1:
+        # the post might be pinned, so we check the second one
+        date2 = date_from_timestamp(float(items[1]['date']))
+        if date2 > date1:
+            return to_str(date2)
+    return to_str(date1)
 
 
 def yes_no(msg: str):
@@ -50,15 +62,16 @@ def yes_no(msg: str):
         else:
             print("Неверный ввод.\n\n\n")
 
+
 enc = None
 vk = None
 data = []
 try:
     enc = CnM.from_path(INPUT_FNAME).best().first().encoding
     print("Угадана кодировка файла: ", enc)
-    if (enc != 'utf-8'):
+    if enc != 'utf-8':
         print("\n\n", ENC_WARN, "\n\n")
-        if (yes_no("Использовать cp1251 вместо текущей кодировки?")):
+        if yes_no("Использовать cp1251 вместо текущей кодировки?"):
             enc = 'cp1251'
     # parse the file with group IDs
     with open(INPUT_FNAME, 'r', newline='', encoding=enc) as csvf:
@@ -71,8 +84,8 @@ try:
             data.append({FIELDNAMES[0]: row[0],  # name
                          FIELDNAMES[1]: row[1],  # link
                          FIELDNAMES[2]: None,  # memcount
-                         FIELDNAMES[3]: None,  # first
-                         FIELDNAMES[3]: None})  # last
+                         FIELDNAMES[3]: None,  # last
+                         FIELDNAMES[3]: None})  # first
 
     # remove blank lines
     data = list(filter(lambda el: len(el[FIELDNAMES[1]]) > 2, data))
@@ -99,7 +112,7 @@ try:
             else:
                 vk = vk_api.VkApi(token=SERVICE_TOKEN,
                                   app_id=APP_ID)
-        try: 
+        try:
             response = vk.method("groups.getMembers", {
                 "group_id": gid,
                 "count": 0  # only need count
@@ -114,7 +127,7 @@ try:
 
         offset = 0
         params = {
-            "count": 1,
+            "count": 2,  # get pinned post and the post after it
         }
         if gid.isdigit():
             params['owner_id'] = -int(gid)
@@ -125,13 +138,13 @@ try:
             response = vk.method("wall.get", params)
             total_posts = response['count']
             print("Всего постов: ", total_posts)
-            date = date_str_from_response(response)
+            date = latest_date_str(response['items'])
             print("Дата последнего поста: ", date)
             dictionary[FIELDNAMES[3]] = date
             # obtain the first post date
             params['offset'] = total_posts - 1
             response = vk.method("wall.get", params)
-            date = date_str_from_response(response)
+            date = latest_date_str(response['items'])
             dictionary[FIELDNAMES[4]] = date
             print("Дата первого поста: ", date)
         except Exception as e:
@@ -148,7 +161,7 @@ try:
 
 except FileNotFoundError as e:
     print(FILE_ERR_STR, '\n', e)
-    with open(INPUT_FNAME, 'w', newline='', encoding = "utf-8") as f:
+    with open(INPUT_FNAME, 'w', newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[INPUT_FILE_HEADER_GROUP_TITLE,
                                                INPUT_FILE_HEADER_LINK], dialect=csv.excel)
         writer.writeheader()
