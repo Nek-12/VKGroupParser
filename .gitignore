@@ -156,3 +156,4 @@ out/
 Output.csv
 Input.csv
 *.xlsx
+/vk_config*

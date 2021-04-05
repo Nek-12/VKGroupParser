@@ -1,5 +1,5 @@
 import sys
-
+from getpass import getpass
 import vk_api
 import csv
 import re
@@ -34,6 +34,14 @@ DATE_ERR_STR = "Не удалось загрузить дату. Возможн�
 ENC_WARN = """ВНИМАНИЕ! Кодировка файла - не UTF-8. \n
 Скорее всего в символах, отличных от латыни - будут ошибки!\n
 Рекомендуется использовать UTF-8"""
+
+
+def auth_handler():
+    try:
+        code = int(input("Введите код из личного сообщения от администрации: "))
+        return code, yes_no("Запомнить это устройство?")
+    except ValueError as e:
+        print(f"Неверный ввод: {e.args[0]}")
 
 
 def date_from_timestamp(timestamp: float):
@@ -134,13 +142,12 @@ try:
                 use_auth = yes_no(LOGIN_REQ_STR)
             if use_auth:
                 login = input("Введите номер телефона или e-mail:").strip()
-                passw = input("Введите пароль:").strip()
-                vk = vk_api.VkApi(login=login, password=passw)
+                passw = getpass("Введите пароль:").strip()
+                vk = vk_api.VkApi(login=login, password=passw, auth_handler=auth_handler)
                 vk.auth()
             else:
                 vk = vk_api.VkApi(token=SERVICE_TOKEN,
                                   app_id=APP_ID)
-
         try:
             print(f"\n\nГруппа: {dictionary[FIELDNAMES[0]]}")
             response = vk.method("groups.getMembers", {
