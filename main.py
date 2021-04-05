@@ -19,6 +19,7 @@ LOGIN_REQ_STR = """Использовать аутентификацию пол�
 SERVICE_TOKEN = '4622f2984622f2984622f2985146541d29446224622f2982671f14f77062bd02f2c0192'
 APP_ID = 7794609
 
+POSSIBLE_ARGS = ['-y', '-n']
 INPUT_FILE_HEADER_GROUP_TITLE = "Название"
 INPUT_FILE_HEADER_LINK = "Ссылка"
 INPUT_FNAME = "Input.csv"
@@ -85,7 +86,7 @@ data = []
 try:
     use_cp1251, use_auth = parse_arg(args[1]), parse_arg(args[2])
 except ValueError as exc:
-    print(f"Неверный аргумент: {exc.args[0]}")
+    print(f"Неверный аргумент: {exc.args[0]}. Возможны только аргументы {POSSIBLE_ARGS}")
     exit(-1)
 except IndexError:
     pass
