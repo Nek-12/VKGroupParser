@@ -1,3 +1,5 @@
+import sys
+
 import vk_api
 import csv
 import re
@@ -8,12 +10,12 @@ from charset_normalizer import CharsetNormalizerMatches as CnM
 # https://github.com/Nek-12
 # Created on Mar 18, 2021
 
-LOGIN_REQ_STR = \
-    "Использовать аутентификацию пользователя? \n" \
-    "В этом случае понадобится ваш номер телефона, пароль.\n" \
-    "Необходимо, чтобы была отключена двухфакторная аутентификация. \n" \
-    "При аутентификации пользователя можно получать число участников приватных и закрытых групп.\n" \
-    "При аутентификации без пароля - только публичных. Пароль и логин нигде не сохраняется."
+LOGIN_REQ_STR = """Использовать аутентификацию пользователя? \n
+В этом случае понадобится ваш номер телефона, пароль.\n
+Необходимо, чтобы была отключена двухфакторная аутентификация. \n
+При аутентификации пользователя можно получать число участников приватных и закрытых групп.\n
+При аутентификации без пароля - только публичных. Пароль и логин нигде не сохраняется."""
+
 SERVICE_TOKEN = '4622f2984622f2984622f2985146541d29446224622f2982671f14f77062bd02f2c0192'
 APP_ID = 7794609
 
@@ -21,15 +23,16 @@ INPUT_FILE_HEADER_GROUP_TITLE = "Название"
 INPUT_FILE_HEADER_LINK = "Ссылка"
 INPUT_FNAME = "Input.csv"
 OUTPUT_FNAME = "Output.csv"
-FILE_ERR_STR = \
-    f"Файл {INPUT_FNAME} не найден или пуст. В папке со скриптом был создан новый файл {INPUT_FNAME}\n" \
-    f"В файле должна быть таблица, экспортированная в csv в формате" \
-    f" |{INPUT_FILE_HEADER_GROUP_TITLE}|{INPUT_FILE_HEADER_LINK}| (без разделителей). Можно без заголовков."
+FILE_ERR_STR = f"""Файл {INPUT_FNAME} не найден или пуст. В папке со скриптом был создан новый файл {INPUT_FNAME}\n
+В файле должна быть таблица, экспортированная в csv в формате\n
+|{INPUT_FILE_HEADER_GROUP_TITLE}|{INPUT_FILE_HEADER_LINK}| (без разделителей). Можно без заголовков."""
+
 FIELDNAMES = ['Название', 'Ссылка', 'Количество участников', 'Последний пост', 'Первый пост']
 DATE_ERR_STR = "Не удалось загрузить дату. Возможно, она недоступна? Пропускаю."
-ENC_WARN = "ВНИМАНИЕ! Кодировка файла - не UTF-8. \n" \
-           "Скорее всего в символах, отличных от латыни - будут ошибки!\n" \
-           "Рекомендуется использовать UTF-8"
+
+ENC_WARN = """ВНИМАНИЕ! Кодировка файла - не UTF-8. \n
+Скорее всего в символах, отличных от латыни - будут ошибки!\n
+Рекомендуется использовать UTF-8"""
 
 
 def date_from_timestamp(timestamp: float):
@@ -63,17 +66,40 @@ def yes_no(msg: str):
             print("Неверный ввод.\n\n\n")
 
 
+def parse_arg(arg: str):
+    if arg == "-y":
+        return True
+    elif arg == "-n":
+        return False
+    else:
+        raise ValueError(arg)
+
+
+use_auth = None
+use_cp1251 = None
+args = sys.argv
 enc = None
 vk = None
 data = []
+
+try:
+    use_cp1251, use_auth = parse_arg(args[1]), parse_arg(args[2])
+except ValueError as exc:
+    print(f"Неверный аргумент: {exc.args[0]}")
+    exit(-1)
+except IndexError:
+    pass
+
 try:
     enc = CnM.from_path(INPUT_FNAME).best().first().encoding
-    print("Угадана кодировка файла: ", enc)
     if enc != 'utf-8':
         print("\n\n", ENC_WARN, "\n\n")
-        if yes_no("Использовать cp1251 вместо текущей кодировки?"):
+        if use_cp1251 is None:
+            use_cp1251 = yes_no("Использовать cp1251 вместо текущей кодировки?")
+        if use_cp1251:
             enc = 'cp1251'
     # parse the file with group IDs
+    print("Используется кодировка: ", enc)
     with open(INPUT_FNAME, 'r', newline='', encoding=enc) as csvf:
         dialect = csv.Sniffer().sniff(csvf.read(1024))
         csvf.seek(0)
@@ -91,7 +117,6 @@ try:
     data = list(filter(lambda el: len(el[FIELDNAMES[1]]) > 2, data))
 
     for dictionary in data:
-        print(f"\n\nГруппа: {dictionary[FIELDNAMES[0]]}")
         url = dictionary[FIELDNAMES[1]]
         try:
             print(url)
@@ -104,7 +129,9 @@ try:
         # get the count
 
         if vk is None:
-            if yes_no(LOGIN_REQ_STR):
+            if use_auth is None:
+                use_auth = yes_no(LOGIN_REQ_STR)
+            if use_auth:
                 login = input("Введите номер телефона или e-mail:").strip()
                 passw = input("Введите пароль:").strip()
                 vk = vk_api.VkApi(login=login, password=passw)
@@ -112,7 +139,9 @@ try:
             else:
                 vk = vk_api.VkApi(token=SERVICE_TOKEN,
                                   app_id=APP_ID)
+
         try:
+            print(f"\n\nГруппа: {dictionary[FIELDNAMES[0]]}")
             response = vk.method("groups.getMembers", {
                 "group_id": gid,
                 "count": 0  # only need count
